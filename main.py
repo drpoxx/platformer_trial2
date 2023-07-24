@@ -15,9 +15,40 @@ PLAYER_VELOCITY = 5
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
+def flip(sprites):
+    return [pygame.transform.flip(sprite, True, False) for sprite in sprites]
+
+def load_sprite_sheets(name1, name2, width, height, direction=False):
+    path = pathlib.Path.cwd().joinpath("assets", name1, name2).glob('**/*')
+    images = [f for f in path if f.is_file()]
+
+    all_sprites = {}
+
+    for image in images:
+        sprite_sheet = pygame.image.load(image).convert_alpha()
+        # Split the iamges into the animations.
+        sprites = []
+        for i in range(sprite_sheet.get_width() // width):
+            surface = pygame.Surface((width, height), pygame.SRCALPHA, 32)
+            rect = pygame.Rect(i * width, 0, width, height)
+            # Drawing (blit) sprite sheet based on the location and the rect (desired frame).
+            surface.blit(sprite_sheet, (0, 0), rect)
+            sprites.append(pygame.transform.scale2x(surface=surface))
+        
+        # Handle the direction of the image based on condition (e.g., moving character left and right).
+        if direction:
+            all_sprites[image.stem + "_right"] = sprites
+            all_sprites[image.stem + "_left"] = flip(sprites)
+        else:
+            all_sprites[image.stem] = sprites
+
+    return all_sprites
+
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     GRAVITY = 1
+    SPRITES = load_sprite_sheets("MainCharacters", "PinkMan", 32, 32, True)
+    ANIMATION_DELAY = 5
 
     def __init__(self, x, y, width, height):
         # Configure the rect.
@@ -47,15 +78,27 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
     
     def loop(self, fps):
-        # Handles things that need to be done constantly for the character.
-        self.y_velocity += min(1, (self.fall_count / fps) * self.GRAVITY)
+        # Handles things that need to be done constantly for the character. Start falling slow and increase pace.
+        # self.y_velocity += min(1, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_velocity, self.y_velocity)
-
+        # Increase the speed falling.
         self.fall_count += 1
+        self.update_sprite()
 
+    def update_sprite(self):
+        sprite_sheet = "idle"
+        if self.x_velocity != 0:
+            sprite_sheet = "run"
+        
+        sprite_sheet_name = sprite_sheet + "_" + self.direction
+        sprites = self.SPRITES[sprite_sheet_name]
+        # Show a different animation every ANIMATION_DELAY seconds (e.g., 5 seconds)
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.sprite = sprites[sprite_index]
+        self.animation_count += 1
 
     def draw(self, window):
-        pygame.draw.rect(window, self.COLOR, self.rect)
+        window.blit(self.sprite, (self.rect.x, self.rect.y))
 
 def get_background(name):
     """
@@ -94,6 +137,7 @@ def handle_move(player):
         player.move_left(PLAYER_VELOCITY)
     if keys[pygame.K_d]:
         player.move_right(PLAYER_VELOCITY)
+
 def main(window):
     clock = pygame.time.Clock()
     background, bg_image = get_background("Blue.png")
