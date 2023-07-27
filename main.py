@@ -97,11 +97,21 @@ class Player(pygame.sprite.Sprite):
     
     def loop(self, fps):
         # Handles things that need to be done constantly for the character. Start falling slow and increase pace.
-        # self.y_velocity += min(1, (self.fall_count / fps) * self.GRAVITY)
+        self.y_velocity += min(1, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_velocity, self.y_velocity)
         # Increase the speed falling.
         self.fall_count += 1
         self.update_sprite()
+
+    def landed(self):
+        self.fall_count = 0
+        self.y_vel = 0
+        self.jump_count = 0
+
+    def hit_head(self):
+        self.count = 0
+        # Reverse the upwards movement to get the most natural effect.
+        self.y_vel *= -1
 
     def update_sprite(self):
         sprite_sheet = "idle"
@@ -143,7 +153,6 @@ class Block(Object):
         self.image.blit(block, (0, 0))
         self.mask = pygame.mask.from_surface(self.image)
 
-
 def get_background(name):
     """
     Function to get the background based on the background types available in the assets folder.
@@ -166,6 +175,15 @@ def get_background(name):
     return tiles, image
 
 def draw(window, background, bg_image, player, objects):
+    """Function to draw the game objects.
+
+    Args:
+        window (pygame.display): Window pygame display object.
+        background (image): The index of the respected background that is to be selected from the bg_image.
+        bg_image (image): background image.
+        player (gygame.sprite.Sprite): Player sprite object.
+        objects (pygame.sprite.Sprite): Objects sprite object.
+    """
     for tile in background:
         window.blit(bg_image, tile)
 
@@ -176,7 +194,28 @@ def draw(window, background, bg_image, player, objects):
 
     pygame.display.update()
 
-def handle_move(player):
+def handle_vertical_collision(player, objects, dy):
+    collided_objects = []
+    for object in objects:
+        if pygame.sprite.collide_mask(player, object):
+            if dy > 0:
+                player.rect.bottom = object.rect.top
+                # Function to handle landing.
+                player.landed()
+            elif dy < 0:
+                player.rect.top = object.rect.bottom
+                # Function to handle hit head.
+                player.hit_head()
+
+        collided_objects.append(object)
+    return collided_objects
+
+def handle_move(player, objects):
+    """Function to handle the player movement of the player object.
+
+    Args:
+        player (pygame.sprite.Sprite): Pygame player sprite object.
+    """
     keys = pygame.key.get_pressed()
 
     player.x_velocity = 0
@@ -184,6 +223,8 @@ def handle_move(player):
         player.move_left(PLAYER_VELOCITY)
     if keys[pygame.K_d]:
         player.move_right(PLAYER_VELOCITY)
+
+    handle_vertical_collision(player, objects, player.y_velocity)
 
 def main(window):
     clock = pygame.time.Clock()
@@ -206,7 +247,7 @@ def main(window):
                 break
         
         player.loop(FPS)
-        handle_move(player)
+        handle_move(player, floor)
         draw(window, background, bg_image, player, floor)
     pygame.quit()
     quit()
