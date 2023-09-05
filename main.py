@@ -27,6 +27,7 @@ def flip(sprites):
     return [pygame.transform.flip(sprite, True, False) for sprite in sprites]
 
 def load_sprite_sheets(name1, name2, width, height, direction=False):
+    # Set the path and files for all images.
     path = pathlib.Path.cwd().joinpath("assets", name1, name2).glob('**/*')
     images = [f for f in path if f.is_file()]
 
@@ -52,13 +53,25 @@ def load_sprite_sheets(name1, name2, width, height, direction=False):
 
     return all_sprites
 
-def load_block(size, distance_selector=96):
+def load_block(size, distance_selector_x=96, distance_selector_y=0):
+    """
+    Function to load the block 
+
+    Args:
+        size (int): Size of the block in the image (around 64)
+        distance_selector_x (int, optional): Distance in the terrain image on the x axis (selector). Defaults to 96.
+        distance_selector_y (int, optional): Distance in the terrain image on the y axis (selector). Defaults to 0.
+
+    Returns:
+        pygame.object: The image is scaled two times (larger)
+    """
     path = pathlib.Path.cwd().joinpath("assets", "Terrain", "Terrain.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
-    # NOTE: This depends on the image field and here we can play with the input.
-    rect = pygame.Rect(distance_selector, 0, size, size)
+    # NOTE: This depends on the image field and here we can play with the input. We can adjust the x and y point through the function
+    rect = pygame.Rect(distance_selector_x, distance_selector_y, size, size)
     surface.blit(image, (0, 0), rect)
+    # Returns a scaled image (enlarged x2)
     return pygame.transform.scale2x(surface)
 
 class Player(pygame.sprite.Sprite):
@@ -78,6 +91,16 @@ class Player(pygame.sprite.Sprite):
         self.direction = "left"
         self.animation_count = 0
         self.fall_count = 0
+        self.jump_count = 0
+
+    def jump(self):
+        # Reverts the gravity to jump up - jump up and gravity goes down.
+        self.y_velocity = -self.GRAVITY * 8
+        self.animation_count = 0
+        self.jump_count += 1
+        if self.jump_count == 1:
+            # Remove gravity that was accumulated.
+            self.fall_count = 0
 
     def move(self, dx, dy):
         self.rect.x += dx
@@ -105,19 +128,29 @@ class Player(pygame.sprite.Sprite):
 
     def landed(self):
         self.fall_count = 0
-        self.y_vel = 0
+        self.y_velocity = 0
         self.jump_count = 0
 
     def hit_head(self):
         self.count = 0
         # Reverse the upwards movement to get the most natural effect.
-        self.y_vel *= -1
+        self.y_velocity *= -1
 
     def update_sprite(self):
         sprite_sheet = "idle"
-        if self.x_velocity != 0:
+        if self.y_velocity < 0:
+            if self.jump_count == 1:
+                sprite_sheet = "jump"
+            elif self.jump_count == 2:
+                sprite_sheet = "double_jump"
+        elif self.y_velocity > self.GRAVITY * 2:
+            sprite_sheet = "fall"
+        elif self.x_velocity != 0:
             sprite_sheet = "run"
         
+        # if sprite_sheet == "jump" or sprite_sheet == "double_jump" or sprite_sheet == "fall":
+        #     sprite_sheet_name = sprite_sheet
+        # else:
         sprite_sheet_name = sprite_sheet + "_" + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
         # Show a different animation every ANIMATION_DELAY seconds (e.g., 5 seconds)
@@ -224,6 +257,7 @@ def handle_move(player, objects):
     if keys[pygame.K_d]:
         player.move_right(PLAYER_VELOCITY)
 
+    # Handle the vertiical colisions
     handle_vertical_collision(player, objects, player.y_velocity)
 
 def main(window):
@@ -245,7 +279,12 @@ def main(window):
             if event.type == pygame.QUIT:
                 run = False
                 break
-        
+            
+            # Handle jumping here and not in handle movement since the event loop will avoid that the play can keep the jump key pressed to fly up.
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_w and player.jump_count < 2:
+                    player.jump()
+
         player.loop(FPS)
         handle_move(player, floor)
         draw(window, background, bg_image, player, floor)
