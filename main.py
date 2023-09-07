@@ -259,7 +259,6 @@ def collide(player, objects, dx):
     player.update()
     return collide_object
 
-
 def handle_move(player, objects):
     """Function to handle the player movement of the player object.
 
