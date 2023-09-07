@@ -164,8 +164,8 @@ class Player(pygame.sprite.Sprite):
         # Pixel mapping of all the pixels in the sprite. Super relevant for pixel pefect collision.
         self.mask = pygame.mask.from_surface(self.sprite)
 
-    def draw(self, window):
-        window.blit(self.sprite, (self.rect.x, self.rect.y))
+    def draw(self, window, offset_x):
+        window.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name=None):
@@ -176,8 +176,8 @@ class Object(pygame.sprite.Sprite):
         self.height = height
         self.name = name
 
-    def draw(self, window):
-        window.blit(self.image, (self.rect.x, self.rect.y))
+    def draw(self, window, offset_x):
+        window.blit(self.image, (self.rect.x - offset_x, self.rect.y))
 
 class Block(Object):
     def __init__(self, x, y, size):
@@ -207,7 +207,7 @@ def get_background(name):
 
     return tiles, image
 
-def draw(window, background, bg_image, player, objects):
+def draw(window, background, bg_image, player, objects, offset_x):
     """Function to draw the game objects.
 
     Args:
@@ -221,9 +221,9 @@ def draw(window, background, bg_image, player, objects):
         window.blit(bg_image, tile)
 
     for object in objects:
-        object.draw(window)
+        object.draw(window, offset_x)
 
-    player.draw(window)
+    player.draw(window, offset_x)
 
     pygame.display.update()
 
@@ -270,6 +270,10 @@ def main(window):
     # Introduce floor left and right of the map.
     floor =[Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
 
+    # Scrolling offset
+    offset_x = 0
+    scroll_area_width = 200
+
     run = True
     while run:
         # Regulate the framerate across different devices.
@@ -287,7 +291,12 @@ def main(window):
 
         player.loop(FPS)
         handle_move(player, floor)
-        draw(window, background, bg_image, player, floor)
+        draw(window, background, bg_image, player, floor, offset_x)
+
+        # Screen scrolling
+        if (((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_velocity > 0) or (
+                (player.rect.left - offset_x <= WIDTH - scroll_area_width) and player.x_velocity < 0)):
+            offset_x += player.x_velocity
     pygame.quit()
     quit()
 
